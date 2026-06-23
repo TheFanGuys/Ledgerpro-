@@ -223,6 +223,7 @@ iframe{width:100%;height:72vh;border-radius:10px;border:none;background:#fff}
       <div class="tools-menu" id="tools-menu">
         <button class="tools-item" onclick="closeTools();doBackup()">&#128190; <span>Backup</span></button>
         <label class="tools-item" style="cursor:pointer">&#128229; <span>Restore</span><input type="file" accept="*/*" onchange="closeTools();doRestore(event)" style="display:none"></label>
+        <button class="tools-item" onclick="closeTools();importFromInvoice()">&#128279; <span>Import from Invoice Pro</span></button>
         <button class="tools-item" onclick="closeTools();doCSV()">&#128202; <span>Export CSV</span></button>
         <button class="tools-item" onclick="closeTools();doPrint()">&#128424; <span>Print / PDF</span></button>
       </div>
@@ -444,7 +445,19 @@ function refreshLocations(){
 function usd(v){ return (parseFloat(v)||0).toLocaleString('en-US',{style:'currency',currency:'USD'}); }
 function n(v){ return parseFloat(v)||0; }
 function csvEsc(v){ return '"'+String(v).replace(/"/g,'""')+'"'; }
-function nextId(){ return currentYear+'-'+(jobs.filter(function(j){return j.year===currentYear;}).length+1); }
+function nextId(){
+  // Highest existing number for this year + 1 (so it never reuses or collides,
+  // even after deletes or after importing out-of-order numbers from Invoice Pro)
+  var maxN=0;
+  jobs.forEach(function(j){
+    if(j.year!==currentYear) return;
+    var m=String(j.id||'').match(/-(\d+)\b/);
+    if(m){ var nn=parseInt(m[1],10); if(nn>maxN) maxN=nn; }
+  });
+  var seq=maxN+1, cand=currentYear+'-'+seq;
+  while(jobs.some(function(j){ return j.id===cand; })){ seq++; cand=currentYear+'-'+seq; }
+  return cand;
+}
 function fmtDate(d, long){
   if(!d) return '';
   var dt = new Date(d+'T12:00:00');
@@ -862,6 +875,131 @@ function doRestore(e){
     catch(err){alert('Invalid backup file.');}
   };
   r.readAsText(file); e.target.value='';
+}
+
+/* ============ Import from Invoice Pro ============ */
+/* Shared mailbox key. If both apps can see the same storage on this device,
+   the transfer happens automatically. If not, we fall back to paste-the-code. */
+var BRIDGE_KEY = 'fg_bridge_inv2led';
+
+function importFromInvoice(){
+  var raw=null, viaAuto=false;
+  // 1) Try the automatic handoff (works only when both apps share storage on this device)
+  try{ raw=localStorage.getItem(BRIDGE_KEY); }catch(e){}
+  if(raw){ viaAuto=true; }
+  // 2) Otherwise ask Chris to paste the code Invoice Pro put on the clipboard
+  if(!raw){
+    raw=prompt('In Invoice Pro, tap "Copy to Ledger Pro". Then come back here and PASTE the code:');
+    if(raw===null) return;
+    raw=raw.trim();
+    if(!raw){ alert('Nothing was pasted. Open Invoice Pro, tap "Copy to Ledger Pro", then paste the code here.'); return; }
+  }
+  var data;
+  try{ data=JSON.parse(raw); }
+  catch(e){ alert('That code did not look right. Make sure you copied the whole thing from Invoice Pro.'); return; }
+  if(!data || data._fanguys_bridge!=='invoice->ledger' || !Array.isArray(data.jobs)){
+    alert('That is not an Invoice Pro transfer code. In Invoice Pro tap "Copy to Ledger Pro" and paste the code it gives you.');
+    return;
+  }
+  var incoming=data.jobs;
+  if(incoming.length===0){
+    alert('No jobs to bring over from Invoice Pro.');
+    if(viaAuto){ try{ localStorage.removeItem(BRIDGE_KEY); }catch(e){} }
+    return;
+  }
+
+  var added=0, skipped=0, touchedCurrent=false, lastImported=null;
+
+  incoming.forEach(function(src){
+    // Send each job into the year of its job date; if no date, use the year selected up top
+    var y=currentYear;
+    if(src.jobDate && /^\d{4}-/.test(src.jobDate)){ var yy=parseInt(src.jobDate.slice(0,4)); if(yy>=2024&&yy<=2030) y=yy; }
+    var bucket;
+    try{ bucket=JSON.parse(localStorage.getItem(SK(y))||'[]'); }catch(e){ bucket=[]; }
+    if(!Array.isArray(bucket)) bucket=[];
+
+    // Skip anything already brought over before (matched on Invoice Pro's own id)
+    if(src.srcId){
+      var dup=bucket.some(function(j){ return j.srcId===src.srcId; });
+      if(dup){ skipped++; return; }
+    }
+
+    // Job number: honor the number Invoice Pro sent; keep it unique so two jobs
+    // can never share a number. If it's already taken, add a small suffix.
+    var desired=(src.jobNo||'').trim();
+    var newId;
+    if(desired){
+      newId=desired; var k=2;
+      while(bucket.some(function(j){ return j.id===newId; })){ newId=desired+'-'+k; k++; }
+    } else {
+      var maxN=0;
+      bucket.forEach(function(j){ var mm=String(j.id||'').match(/-(\d+)\b/); if(mm){ var nn=parseInt(mm[1],10); if(nn>maxN)maxN=nn; } });
+      var seq=maxN+1; newId=y+'-'+seq;
+      while(bucket.some(function(j){ return j.id===newId; })){ seq++; newId=y+'-'+seq; }
+    }
+
+    // Customer: reuse an existing one if it matches, otherwise bring it in as a
+    // Custom name so it shows up (editable) in the form for you to confirm on Save.
+    var incCust=(src.customer||'').trim();
+    var cust='', custName='';
+    if(incCust){
+      var matchC=customers.find(function(c){ return c.toLowerCase()===incCust.toLowerCase(); });
+      if(matchC){ cust=matchC; }
+      else { cust='Custom...'; custName=incCust; }
+    }
+
+    var job={
+      id:newId, year:y,
+      customer:cust, customCustomer:custName,
+      location:src.location||'',
+      jobDate:src.jobDate||'',
+      jobType:src.jobType||'',
+      installSubtype:src.installSubtype||'',
+      fanCount:src.fanCount||'',
+      invoiceAmount:src.invoiceAmount||'',
+      labor:src.labor||'',
+      totalExpenses:src.totalExpenses||'',
+      expenses:{
+        Hotel:(src.expenses&&src.expenses.Hotel)||'',
+        Airfare:(src.expenses&&src.expenses.Airfare)||'',
+        'Rental Car':(src.expenses&&src.expenses['Rental Car'])||'',
+        Fuel:(src.expenses&&src.expenses.Fuel)||'',
+        Material:(src.expenses&&src.expenses.Material)||''
+      },
+      notes:src.notes||'',
+      srcId:src.srcId||'',
+      createdAt:new Date().toISOString()
+    };
+    bucket.push(job);
+    try{ localStorage.setItem(SK(y), JSON.stringify(bucket)); }catch(e){}
+    added++;
+    lastImported={ id:newId, year:y };
+    if(y===currentYear) touchedCurrent=true;
+  });
+
+  saveCustomers();
+  if(viaAuto){ try{ localStorage.removeItem(BRIDGE_KEY); }catch(e){} }
+
+  // One report came in → jump to its year and open it so you can confirm the
+  // customer and add the invoice amount + labor, then hit Save.
+  if(added===1 && lastImported){
+    currentYear=lastImported.year;
+    var ysel=document.getElementById('year-sel'); if(ysel) ysel.value=String(currentYear);
+    jobs=loadJobs(currentYear);
+    refreshLocations();
+    render();
+    if(skipped>0) alert(skipped+' report'+(skipped!==1?'s were':' was')+' already imported earlier, so it was skipped. Opening the new one now.');
+    openForm(lastImported.id);
+    return;
+  }
+
+  // Zero, or several at once → just file them and report.
+  if(touchedCurrent){ jobs=loadJobs(currentYear); }
+  refreshLocations();
+  render();
+  var msg = added>0 ? ('Brought over '+added+' jobs from Invoice Pro.') : 'No new jobs were brought over.';
+  if(skipped>0) msg+='\n'+skipped+' that '+(skipped!==1?'were':'was')+' already imported earlier got skipped.';
+  alert(msg);
 }
 
 function openSettings(){renderCustList();document.getElementById('settings-overlay').style.display='';document.body.style.overflow='hidden';}
