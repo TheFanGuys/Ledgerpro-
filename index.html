@@ -2,11 +2,17 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="Ledger Pro">
+<meta name="theme-color" content="#000000">
 <title>Ledger Pro</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="192x192" href="icon-192.png">
+<link rel="apple-touch-icon" sizes="512x512" href="icon-512.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html,body{min-height:100%;background:#000000;color:#e8eaf0;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif}
@@ -223,7 +229,7 @@ iframe{width:100%;height:72vh;border-radius:10px;border:none;background:#fff}
       </div>
     </div>
     <select id="year-sel" onchange="changeYear()" style="background:var(--s3);color:var(--tx);border:1.5px solid var(--bd2);border-radius:8px;padding:5px 24px 5px 9px;font-size:15px;font-weight:900;cursor:pointer;-webkit-appearance:none;appearance:none;background-image:url(&quot;data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 3.5L9 1' stroke='%2352a0ff' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E&quot;);background-repeat:no-repeat;background-position:right 7px center;outline:none">
-      <option>2024</option><option>2025</option><option>2026</option><option>2027</option><option>2028</option><option>2029</option>
+      <!-- options generated at runtime by buildYearOptions() -->
     </select>
   </div>
 </nav>
@@ -231,6 +237,7 @@ iframe{width:100%;height:72vh;border-radius:10px;border:none;background:#fff}
   <div class="toolbar">
     <button class="btn btn-dark" id="expand-btn" onclick="toggleExpand()" style="display:none">&#8862; Expand All</button>
   </div>
+  <div id="backup-nag" onclick="doBackup()" style="display:none;background:rgba(255,159,10,.14);border:1px solid rgba(255,159,10,.5);color:#ffb340;border-radius:10px;padding:11px 14px;margin-bottom:12px;font-size:13px;font-weight:700;cursor:pointer;text-align:center"></div>
   <button class="fab-newjob" onclick="openForm(null)"><span style="font-size:19px;line-height:1">+</span> New Job</button>
   <div id="jobs-tab" style="background:#000">
     <div id="jobs-list"></div>
@@ -408,39 +415,59 @@ function unlockApp(){
 
 function SK(y){ return 'fg_j_' + y; }
 
+/* Guarded write. Returns true on success, false if storage refused it.
+   Never let a save fail silently — that is how records disappear. */
+function safeSet(key, val){
+  try { localStorage.setItem(key, val); return true; }
+  catch(e){
+    console.error('Save failed', key, e);
+    return false;
+  }
+}
+function saveFailed(){
+  alert('COULD NOT SAVE\n\nYour device refused to store the change, so it was NOT saved.\n\nOpen \u2630 \u2192 Backup right away to protect what you have, then reload the app.');
+}
+
+/* Jobs come from storage only. An empty year stays empty — deletions stick. */
 function loadJobs(y) {
   try {
     var s = localStorage.getItem(SK(y));
-    if (s) { var p = JSON.parse(s); if (p.length > 0) return p; }
-    if (SEED[y]) { localStorage.setItem(SK(y), JSON.stringify(SEED[y])); return SEED[y]; }
+    if (s !== null) { var p = JSON.parse(s); if (Array.isArray(p)) return p; }
   } catch(e){}
   return [];
 }
-function seedAllYears() {
-  ['2024','2025','2026'].forEach(function(yr) {
-    var y = parseInt(yr);
-    try {
-      var s = localStorage.getItem(SK(y));
-      var existing = s ? JSON.parse(s) : [];
-      if (existing.length === 0 && SEED[y] && SEED[y].length > 0) {
-        localStorage.setItem(SK(y), JSON.stringify(SEED[y]));
+
+/* The starter data is imported ONCE, then never again. After this runs, the
+   copy baked into the app file is dead weight and can never overwrite you. */
+var SEED_FLAG = 'fg_seeded_v1';
+function runSeedOnce() {
+  try {
+    if (localStorage.getItem(SEED_FLAG)) return;            // already imported
+    Object.keys(SEED).forEach(function(k) {
+      var y = parseInt(k), key = SK(y), existing = null;
+      try { existing = localStorage.getItem(key); } catch(e){}
+      // only fill a year that has never been written to
+      if (existing === null && SEED[y] && SEED[y].length) {
+        safeSet(key, JSON.stringify(SEED[y]));
       }
-    } catch(e){}
-  });
+    });
+    localStorage.setItem(SEED_FLAG, new Date().toISOString());
+  } catch(e){}
 }
-function saveJobs(){ localStorage.setItem(SK(currentYear), JSON.stringify(jobs)); }
+
+function saveJobs(){
+  if(!safeSet(SK(currentYear), JSON.stringify(jobs))) { saveFailed(); return false; }
+  return true;
+}
 function loadCustomers(){
   try{ var s=localStorage.getItem('fg_c'); return s ? JSON.parse(s) : DEFAULT_CUSTS.slice(); }
   catch(e){ return DEFAULT_CUSTS.slice(); }
 }
-function saveCustomers(){ localStorage.setItem('fg_c', JSON.stringify(customers)); }
+function saveCustomers(){ if(!safeSet('fg_c', JSON.stringify(customers))) saveFailed(); }
 function refreshLocations(){
   var s = {};
-  for (var y=2024; y<=2030; y++){
+  yearRange().forEach(function(y){
     try{ JSON.parse(localStorage.getItem(SK(y))||'[]').forEach(function(j){ if(j.location) s[j.location]=1; }); }catch(e){}
-  }
-  [2024,2025,2026].forEach(function(yr){
-    if(SEED[yr]) SEED[yr].forEach(function(j){ if(j.location) s[j.location]=1; });
   });
   allLocations = Object.keys(s).sort();
 }
@@ -469,14 +496,57 @@ function fmtDate(d, long){
 }
 function h(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function initApp(){
-  seedAllYears();
+/* Ask iOS to keep this data. Without it, storage is "best-effort" and can be
+   evicted after ~7 days of not opening the app. With it, we're excluded. */
+function requestPersistence(){
+  try{
+    if (navigator.storage && navigator.storage.persist){
+      navigator.storage.persisted().then(function(already){
+        if (!already) navigator.storage.persist();
+      }).catch(function(){});
+    }
+  }catch(e){}
+}
+
+/* Years are worked out at runtime, so this never hits a cliff.
+   Range = earliest year that has data (or 2024) .. next year. */
+var FIRST_YEAR = 2024;
+function yearRange(){
+  var lo = FIRST_YEAR, hi = new Date().getFullYear() + 1, found = [];
+  for (var i = 0; i < localStorage.length; i++){
+    var k = localStorage.key(i);
+    if (k && /^fg_j_(\d{4})$/.test(k)){
+      var y = parseInt(k.slice(5), 10);
+      try {
+        var v = JSON.parse(localStorage.getItem(k) || '[]');
+        if (Array.isArray(v) && v.length) found.push(y);
+      } catch(e){}
+    }
+  }
+  found.forEach(function(y){ if (y < lo) lo = y; if (y > hi) hi = y; });
+  var out = [];
+  for (var y = lo; y <= hi; y++) out.push(y);
+  return out;
+}
+function buildYearOptions(){
   var sel = document.getElementById('year-sel');
-  for(var i=0;i<sel.options.length;i++) if(parseInt(sel.options[i].value)===currentYear){ sel.selectedIndex=i; break; }
+  if (!sel) return;
+  var years = yearRange();
+  if (years.indexOf(currentYear) < 0) currentYear = years[years.length-1];
+  sel.innerHTML = years.map(function(y){
+    return '<option value="'+y+'"'+(y===currentYear?' selected':'')+'>'+y+'</option>';
+  }).join('');
+}
+
+function initApp(){
+  requestPersistence();
+  runSeedOnce();
+  buildYearOptions();
   customers = loadCustomers();
   jobs = loadJobs(currentYear);
   refreshLocations();
   render();
+  checkBackupNag();
 }
 
 function changeYear(){
@@ -860,9 +930,116 @@ function buildCSV(){
   return [hdrs.map(csvEsc).join(',')].concat(rows).concat([tot]).join('\n');
 }
 
+/* ═══════════════════════════════════════════════════
+   BACKUP  — every year, every customer, one file.
+   This file is the real record. Save it to Files/iCloud.
+═══════════════════════════════════════════════════ */
+var LAST_BACKUP_KEY = 'fg_last_backup';
+
+function buildBackup(){
+  var all = {};
+  for (var y = 2020; y <= new Date().getFullYear() + 2; y++){
+    try {
+      var s = localStorage.getItem(SK(y));
+      if (s !== null){ var p = JSON.parse(s); if (Array.isArray(p) && p.length) all[y] = p; }
+    } catch(e){}
+  }
+  return JSON.stringify({
+    app:'Ledger Pro', v:2, exportedAt:new Date().toISOString(),
+    years: all, customers: customers
+  }, null, 2);
+}
+
+function backupFilename(){
+  var d=new Date(), p=function(n){return (n<10?'0':'')+n;};
+  return 'FanGuys-Ledger-'+d.getFullYear()+'-'+p(d.getMonth()+1)+'-'+p(d.getDate())+'.json';
+}
+
+function markBackedUp(){
+  try{ localStorage.setItem(LAST_BACKUP_KEY, new Date().toISOString()); }catch(e){}
+  var b=document.getElementById('backup-nag'); if(b) b.style.display='none';
+}
+
 function doBackup(){
-  var content=JSON.stringify({year:currentYear,exportedAt:new Date().toISOString(),jobs:jobs.filter(function(j){return j.year===currentYear;})},null,2);
-  showExport('backup',content);
+  var content = buildBackup(), name = backupFilename();
+  var count = 0;
+  try { var yy=JSON.parse(content).years; Object.keys(yy).forEach(function(k){ count+=yy[k].length; }); } catch(e){}
+
+  var file;
+  try { file = new File([content], name, {type:'application/json'}); } catch(e){ file = null; }
+
+  // iPhone: share sheet -> "Save to Files" -> iCloud Drive. This is the one that matters.
+  if (file && navigator.canShare && navigator.canShare({files:[file]}) && navigator.share){
+    navigator.share({files:[file], title:'Fan Guys Ledger Backup'})
+      .then(function(){ markBackedUp(); })
+      .catch(function(err){ if(err && err.name==='AbortError') return; downloadBackup(content,name); });
+    return;
+  }
+  downloadBackup(content, name);
+}
+
+function downloadBackup(content, name){
+  try{
+    var blob=new Blob([content],{type:'application/json'});
+    var url=URL.createObjectURL(blob);
+    var a=document.createElement('a'); a.href=url; a.download=name;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){URL.revokeObjectURL(url);},2000);
+    markBackedUp();
+  }catch(e){
+    showExport('backup', content);   // last resort: copy/paste
+  }
+}
+
+/* Nag if it has been more than 14 days. Backups only work if you actually do them. */
+function checkBackupNag(){
+  var bar=document.getElementById('backup-nag'); if(!bar) return;
+  var last=null; try{ last=localStorage.getItem(LAST_BACKUP_KEY); }catch(e){}
+  var days = last ? Math.floor((Date.now()-new Date(last).getTime())/86400000) : 999;
+  if (days >= 14){
+    bar.textContent = last
+      ? '\u26a0\ufe0f Last backup was '+days+' days ago \u2014 tap to back up'
+      : '\u26a0\ufe0f You have never backed up \u2014 tap to save a copy';
+    bar.style.display='block';
+  } else { bar.style.display='none'; }
+}
+
+function doRestore(e){
+  var file=e.target.files[0]; if(!file) return;
+  var r=new FileReader();
+  r.onload=function(ev){
+    var d;
+    try{ d=JSON.parse(ev.target.result); }
+    catch(err){ alert('That file is not a valid backup.'); return; }
+
+    var restored=0, yrs=[];
+    if (d && d.years && typeof d.years==='object'){         // v2: every year
+      Object.keys(d.years).forEach(function(y){
+        var arr=d.years[y];
+        if(Array.isArray(arr)){
+          if(!safeSet(SK(parseInt(y)), JSON.stringify(arr))){ saveFailed(); return; }
+          restored+=arr.length; yrs.push(y);
+        }
+      });
+      if (Array.isArray(d.customers) && d.customers.length){
+        customers=d.customers; saveCustomers();
+      }
+    } else if (d && d.jobs){                                 // v1: single year
+      var imp=d.jobs||[];
+      if(!safeSet(SK(d.year), JSON.stringify(imp))){ saveFailed(); return; }
+      restored=imp.length; yrs.push(String(d.year));
+    } else {
+      alert('That file is not a Ledger Pro backup.'); return;
+    }
+
+    try{ localStorage.setItem(SEED_FLAG,'restored'); }catch(e){}  // never re-seed over a restore
+    customers=loadCustomers();
+    jobs=loadJobs(currentYear);
+    refreshLocations(); render(); checkBackupNag();
+    alert('Restored '+restored+' jobs across '+yrs.length+' year'+(yrs.length!==1?'s':'')+' ('+yrs.sort().join(', ')+').');
+  };
+  r.onerror=function(){ alert('Could not read that file.'); };
+  r.readAsText(file); e.target.value='';
 }
 function doCSV(){ showExport('csv',buildCSV()); }
 function doPrint(){ showExport('pdf',buildPrintHTML()); }
@@ -893,16 +1070,6 @@ function showExport(type,content){
   document.body.style.overflow='hidden';
 }
 function closeExport(){document.getElementById('export-overlay').style.display='none';document.body.style.overflow='';}
-
-function doRestore(e){
-  var file=e.target.files[0]; if(!file) return;
-  var r=new FileReader();
-  r.onload=function(ev){
-    try{var d=JSON.parse(ev.target.result),imp=d.jobs||[];localStorage.setItem(SK(d.year),JSON.stringify(imp));if(d.year===currentYear){jobs=imp;render();}alert('Imported '+imp.length+' jobs for '+d.year);}
-    catch(err){alert('Invalid backup file.');}
-  };
-  r.readAsText(file); e.target.value='';
-}
 
 /* ============ Import from Invoice Pro ============ */
 /* Shared mailbox key. If both apps can see the same storage on this device,
@@ -998,7 +1165,7 @@ function importFromInvoice(){
       createdAt:new Date().toISOString()
     };
     bucket.push(job);
-    try{ localStorage.setItem(SK(y), JSON.stringify(bucket)); }catch(e){}
+    if(!safeSet(SK(y), JSON.stringify(bucket))){ saveFailed(); return; }
     added++;
     lastImported={ id:newId, year:y };
     if(y===currentYear) touchedCurrent=true;

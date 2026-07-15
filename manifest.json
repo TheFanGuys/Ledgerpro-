@@ -1,0 +1,32 @@
+{
+  "name": "Ledger Pro — Fan Guys",
+  "short_name": "Ledger Pro",
+  "description": "Fan Guys annual job ledger and financial summary",
+  "id": "/ledgerpro/",
+  "start_url": ".",
+  "scope": ".",
+  "display": "standalone",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
