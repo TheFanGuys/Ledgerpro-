@@ -19,7 +19,7 @@ html,body{min-height:100%;background:#000000;color:#e8eaf0;font-family:-apple-sy
 input,select,textarea,button{font-family:inherit;font-size:inherit}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:#1a1d27}::-webkit-scrollbar-thumb{background:#3a4060;border-radius:3px}
 :root{--bg:#000000;--s1:#161923;--s2:#1c2030;--s3:#232840;--bd:#252d42;--bd2:#323d58;--acc:#52a0ff;--tx:#e8eaf0;--mid:#8892a4;--dim:#4a5568;--gr:#34d399;--am:#fbbf24}
-nav{position:sticky;top:0;z-index:50;background:rgba(15,17,23,.97);border-bottom:1.5px solid var(--bd);backdrop-filter:blur(12px);display:flex;align-items:center;padding:0 14px;gap:0}
+nav{position:sticky;top:0;z-index:50;background:rgba(15,17,23,.97);border-bottom:1.5px solid var(--bd);backdrop-filter:blur(12px);display:flex;align-items:center;padding:env(safe-area-inset-top,0px) calc(14px + env(safe-area-inset-right,0px)) 0 calc(14px + env(safe-area-inset-left,0px));gap:0;min-height:calc(56px + env(safe-area-inset-top,0px))}
 .brand{display:flex;align-items:center;gap:10px;padding:11px 0;margin-right:14px}
 .brand-name{font-weight:900;font-size:20px;letter-spacing:3px;color:var(--tx);text-transform:uppercase;line-height:1}
 .brand-sub{font-size:8px;letter-spacing:3px;text-transform:uppercase;color:var(--dim)}
@@ -34,7 +34,7 @@ nav{position:sticky;top:0;z-index:50;background:rgba(15,17,23,.97);border-bottom
 .btn-green{background:rgba(20,83,45,.7);color:var(--mid);border:1.5px solid #166534}
 .btn-red{background:rgba(127,29,29,.7);color:var(--mid);border:1.5px solid #991b1b}
 .btn-ghost{background:transparent;color:var(--mid);border:1.5px solid var(--bd2)}
-main{max-width:900px;margin:0 auto;padding:16px 14px 96px;min-height:calc(100vh - 60px);background:#000}
+main{max-width:900px;margin:0 auto;padding:16px calc(14px + env(safe-area-inset-right,0px)) calc(96px + env(safe-area-inset-bottom,0px)) calc(14px + env(safe-area-inset-left,0px));min-height:calc(100vh - 60px);background:#000}
 .toolbar{display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center}
 .tools-wrap{position:relative}
 .tools-menu{position:absolute;top:100%;right:0;margin-top:6px;z-index:120;background:var(--s2);border:1.5px solid var(--bd2);border-radius:10px;box-shadow:0 12px 36px rgba(0,0,0,.6);overflow:hidden;min-width:170px;display:none}
@@ -44,7 +44,7 @@ main{max-width:900px;margin:0 auto;padding:16px 14px 96px;min-height:calc(100vh 
 .tools-item:active{background:var(--s3)}
 .tools-item span{flex:1}
 .tools-sep{height:6px;background:var(--bg);border-bottom:1px solid var(--bd)}
-.fab-newjob{position:fixed;right:16px;bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:90;background:var(--acc);color:#fff;border:none;border-radius:30px;padding:14px 22px;font-weight:800;font-size:14px;letter-spacing:1px;text-transform:uppercase;box-shadow:0 8px 26px rgba(82,160,255,.5);display:flex;align-items:center;gap:8px;cursor:pointer}
+.fab-newjob{position:fixed;right:calc(16px + env(safe-area-inset-right,0px));bottom:calc(18px + env(safe-area-inset-bottom,0px));z-index:90;background:var(--acc);color:#fff;border:none;border-radius:30px;padding:14px 22px;font-weight:800;font-size:14px;letter-spacing:1px;text-transform:uppercase;box-shadow:0 8px 26px rgba(82,160,255,.5);display:flex;align-items:center;gap:8px;cursor:pointer}
 .fab-newjob:active{opacity:.85;transform:scale(.97)}
 /* faint background image behind the jobs list (watermark) */
 #jobs-bg{position:fixed;inset:0;z-index:0;pointer-events:none;background-repeat:no-repeat;background-position:center 38%;background-size:min(70vw,420px);opacity:0;transition:opacity .3s}
@@ -158,7 +158,7 @@ iframe{width:100%;height:72vh;border-radius:10px;border:none;background:#fff}
 .rcpt-tally{font-size:10px;color:var(--acc);margin-top:4px;min-height:13px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
 .rcpt-tally .rcpt-undo{color:var(--mid);text-decoration:underline;cursor:pointer;font-size:10px}
 /* PIN lock screen */
-#lock-screen{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:24px}
+#lock-screen{position:fixed;inset:0;z-index:1000;background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:calc(24px + env(safe-area-inset-top,0px)) calc(24px + env(safe-area-inset-right,0px)) calc(24px + env(safe-area-inset-bottom,0px)) calc(24px + env(safe-area-inset-left,0px))}
 .lock-logo{margin-bottom:18px}
 .lock-title{font-weight:900;font-size:24px;letter-spacing:5px;text-transform:uppercase;color:var(--tx)}
 .lock-sub{font-size:10px;letter-spacing:3px;text-transform:uppercase;color:var(--dim);margin-top:4px;margin-bottom:26px}
@@ -223,7 +223,8 @@ iframe{width:100%;height:72vh;border-radius:10px;border:none;background:#fff}
         <div class="tools-sep"></div>
         <button class="tools-item" onclick="closeTools();importFromInvoice()">&#128279; <span>Import from Invoice Pro</span></button>
         <button class="tools-item" onclick="closeTools();doBackup()">&#128190; <span>Backup</span></button>
-        <label class="tools-item" style="cursor:pointer">&#128229; <span>Restore</span><input type="file" accept="*/*" onchange="closeTools();doRestore(event)" style="display:none"></label>
+        <label class="tools-item" style="cursor:pointer">&#128229; <span>Restore from File</span><input type="file" accept=".json,.txt,text/plain,application/json,*/*" onchange="closeTools();doRestore(event)" style="display:none"></label>
+        <button class="tools-item" onclick="closeTools();doRestorePaste()">&#128203; <span>Restore from Text (Paste)</span></button>
         <button class="tools-item" onclick="closeTools();doCSV()">&#128202; <span>Export CSV</span></button>
         <button class="tools-item" onclick="closeTools();doPrint()">&#128424; <span>Print / PDF</span></button>
       </div>
@@ -1004,42 +1005,124 @@ function checkBackupNag(){
   } else { bar.style.display='none'; }
 }
 
+/* Accepts every backup shape we have ever produced:
+     v2  {years:{2024:[...],...}, customers:[...]}     (current, all years)
+     v1  {year:2026, jobs:[...]}                        (old, one year)
+     raw [ {...}, {...} ]                               (a bare jobs array)
+   Text saved via Notes can pick up smart quotes — clean those first. */
+function parseBackupText(text){
+  if(!text) return null;
+  var t = String(text).trim()
+    .replace(/[\u201C\u201D\u201E\u2033]/g, '"')   // curly double quotes
+    .replace(/[\u2018\u2019\u201B\u2032]/g, "'")   // curly single quotes
+    .replace(/\u00A0/g, ' ');                      // non-breaking spaces
+  var i = t.search(/[\{\[]/);                      // ignore any text pasted around it
+  if(i > 0) t = t.slice(i);
+  var last = Math.max(t.lastIndexOf('}'), t.lastIndexOf(']'));
+  if(last > -1) t = t.slice(0, last+1);
+  var d;
+  try{ d = JSON.parse(t); }catch(e){ return null; }
+
+  var out = { years:{}, customers:[] };
+  if(Array.isArray(d)){                             // bare array of jobs
+    d.forEach(function(j){
+      var y = j.year || (j.jobDate ? parseInt(j.jobDate.slice(0,4)) : null) ||
+              (String(j.id||'').match(/^(\d{4})/) ? parseInt(String(j.id).slice(0,4)) : null);
+      if(!y) return;
+      (out.years[y] = out.years[y] || []).push(j);
+    });
+  } else if(d && d.years && typeof d.years==='object'){   // v2
+    Object.keys(d.years).forEach(function(y){ if(Array.isArray(d.years[y])) out.years[y]=d.years[y]; });
+    if(Array.isArray(d.customers)) out.customers = d.customers;
+  } else if(d && Array.isArray(d.jobs)){                   // v1
+    var yr = d.year || (d.jobs[0] && d.jobs[0].year);
+    if(!yr) return null;
+    out.years[yr] = d.jobs;
+  } else return null;
+
+  if(Object.keys(out.years).length===0) return null;
+  return out;
+}
+
+/* replace=false  -> MERGE: add jobs you don't have, never touch what's there
+   replace=true   -> overwrite those years wholesale */
+function applyRestore(parsed, replace){
+  var added=0, skipped=0, replaced=0, yrs=[];
+  Object.keys(parsed.years).forEach(function(k){
+    var y = parseInt(k), incoming = parsed.years[k];
+    if(!incoming.length) return;
+    yrs.push(k);
+    if(replace){
+      if(!safeSet(SK(y), JSON.stringify(incoming))){ saveFailed(); return; }
+      replaced += incoming.length;
+      return;
+    }
+    var existing = loadJobs(y);
+    var have = {};
+    existing.forEach(function(j){ have[j.id]=1; });
+    incoming.forEach(function(j){
+      if(have[j.id]){ skipped++; return; }
+      if(!j.year) j.year = y;
+      existing.push(j); have[j.id]=1; added++;
+    });
+    existing.sort(function(a,b){
+      var na=parseInt((String(a.id).match(/-(\d+)$/)||[0,0])[1]);
+      var nb=parseInt((String(b.id).match(/-(\d+)$/)||[0,0])[1]);
+      return na-nb;
+    });
+    if(!safeSet(SK(y), JSON.stringify(existing))){ saveFailed(); return; }
+  });
+
+  if(parsed.customers.length){
+    parsed.customers.forEach(function(c){ if(customers.indexOf(c)<0) customers.push(c); });
+    saveCustomers();
+  }
+
+  try{ localStorage.setItem(SEED_FLAG,'restored'); }catch(e){}
+  customers = loadCustomers();
+  buildYearOptions();
+  jobs = loadJobs(currentYear);
+  refreshLocations(); render(); checkBackupNag();
+
+  var msg = replace
+    ? 'Replaced '+yrs.length+' year'+(yrs.length!==1?'s':'')+' ('+yrs.sort().join(', ')+') with '+replaced+' jobs.'
+    : 'Added '+added+' job'+(added!==1?'s':'')+' from years '+yrs.sort().join(', ')+'.'+
+      (skipped>0 ? '\n\n'+skipped+' job'+(skipped!==1?'s were':' was')+' already in your ledger, so '+(skipped!==1?'they were':'it was')+' left untouched.' : '');
+  alert(msg);
+}
+
+function startRestore(text){
+  var parsed = parseBackupText(text);
+  if(!parsed){
+    alert('That does not look like a Ledger Pro backup.\n\nIt should start with { and contain your jobs.');
+    return;
+  }
+  var count=0, yl=Object.keys(parsed.years).sort();
+  yl.forEach(function(y){ count += parsed.years[y].length; });
+  var merge = window.confirm(
+    'Found '+count+' job'+(count!==1?'s':'')+' from '+yl.join(', ')+'.\n\n'+
+    'OK = ADD the missing ones, keep everything you already have (recommended).\n\n'+
+    'Cancel = REPLACE those years completely (deletes current jobs in '+yl.join(', ')+').'
+  );
+  if(!merge){
+    if(!window.confirm('REPLACE will DELETE your current jobs in '+yl.join(', ')+' and cannot be undone.\n\nAre you sure?')) return;
+  }
+  applyRestore(parsed, !merge);
+}
+
 function doRestore(e){
   var file=e.target.files[0]; if(!file) return;
   var r=new FileReader();
-  r.onload=function(ev){
-    var d;
-    try{ d=JSON.parse(ev.target.result); }
-    catch(err){ alert('That file is not a valid backup.'); return; }
-
-    var restored=0, yrs=[];
-    if (d && d.years && typeof d.years==='object'){         // v2: every year
-      Object.keys(d.years).forEach(function(y){
-        var arr=d.years[y];
-        if(Array.isArray(arr)){
-          if(!safeSet(SK(parseInt(y)), JSON.stringify(arr))){ saveFailed(); return; }
-          restored+=arr.length; yrs.push(y);
-        }
-      });
-      if (Array.isArray(d.customers) && d.customers.length){
-        customers=d.customers; saveCustomers();
-      }
-    } else if (d && d.jobs){                                 // v1: single year
-      var imp=d.jobs||[];
-      if(!safeSet(SK(d.year), JSON.stringify(imp))){ saveFailed(); return; }
-      restored=imp.length; yrs.push(String(d.year));
-    } else {
-      alert('That file is not a Ledger Pro backup.'); return;
-    }
-
-    try{ localStorage.setItem(SEED_FLAG,'restored'); }catch(e){}  // never re-seed over a restore
-    customers=loadCustomers();
-    jobs=loadJobs(currentYear);
-    refreshLocations(); render(); checkBackupNag();
-    alert('Restored '+restored+' jobs across '+yrs.length+' year'+(yrs.length!==1?'s':'')+' ('+yrs.sort().join(', ')+').');
-  };
+  r.onload=function(ev){ startRestore(ev.target.result); };
   r.onerror=function(){ alert('Could not read that file.'); };
   r.readAsText(file); e.target.value='';
+}
+
+function doRestorePaste(){
+  var t = window.prompt('Paste your backup text here (from Notes, a .txt file, or the clipboard):');
+  if(t===null) return;
+  if(!t.trim()){ alert('Nothing was pasted.'); return; }
+  startRestore(t);
 }
 function doCSV(){ showExport('csv',buildCSV()); }
 function doPrint(){ showExport('pdf',buildPrintHTML()); }
