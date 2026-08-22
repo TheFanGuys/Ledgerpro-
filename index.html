@@ -971,7 +971,7 @@ function doBackup(){
 
   // iPhone: share sheet -> "Save to Files" -> iCloud Drive. This is the one that matters.
   if (file && navigator.canShare && navigator.canShare({files:[file]}) && navigator.share){
-    navigator.share({files:[file], title:'Fan Guys Ledger Backup'})
+    navigator.share({files:[file]})
       .then(function(){ markBackedUp(); })
       .catch(function(err){ if(err && err.name==='AbortError') return; downloadBackup(content,name); });
     return;
@@ -1091,23 +1091,116 @@ function applyRestore(parsed, replace){
   alert(msg);
 }
 
+/* Shows EXACTLY what each choice does, with real numbers, before you commit.
+   Three real options — Cancel always means cancel, never "replace". */
 function startRestore(text){
   var parsed = parseBackupText(text);
   if(!parsed){
     alert('That does not look like a Ledger Pro backup.\n\nIt should start with { and contain your jobs.');
     return;
   }
-  var count=0, yl=Object.keys(parsed.years).sort();
-  yl.forEach(function(y){ count += parsed.years[y].length; });
-  var merge = window.confirm(
-    'Found '+count+' job'+(count!==1?'s':'')+' from '+yl.join(', ')+'.\n\n'+
-    'OK = ADD the missing ones, keep everything you already have (recommended).\n\n'+
-    'Cancel = REPLACE those years completely (deletes current jobs in '+yl.join(', ')+').'
-  );
-  if(!merge){
-    if(!window.confirm('REPLACE will DELETE your current jobs in '+yl.join(', ')+' and cannot be undone.\n\nAre you sure?')) return;
-  }
-  applyRestore(parsed, !merge);
+
+  // Work out the true consequences of each choice, per year
+  var yl = Object.keys(parsed.years).sort();
+  var totalIn=0, willAdd=0, alreadyHave=0, willDelete=0, rows=[];
+  yl.forEach(function(k){
+    var y=parseInt(k), incoming=parsed.years[k], existing=loadJobs(y);
+    var have={}; existing.forEach(function(j){ have[j.id]=1; });
+    var add=0, dup=0;
+    incoming.forEach(function(j){ if(have[j.id]) dup++; else add++; });
+    totalIn+=incoming.length; willAdd+=add; alreadyHave+=dup; willDelete+=existing.length;
+    rows.push({y:k, incoming:incoming.length, add:add, dup:dup, cur:existing.length});
+  });
+
+  var ov=document.createElement('div');
+  ov.className='overlay';
+  ov.style.alignItems='center';
+
+  function esc(t){ return String(t).replace(/[&<>]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;'}[c];}); }
+
+  var tbl = rows.map(function(r){
+    return '<tr>'
+      +'<td style="padding:6px 8px;font-weight:800;color:var(--acc)">'+esc(r.y)+'</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+r.cur+'</td>'
+      +'<td style="padding:6px 8px;text-align:right">'+r.incoming+'</td>'
+      +'<td style="padding:6px 8px;text-align:right;color:var(--gr);font-weight:800">+'+r.add+'</td>'
+      +'</tr>';
+  }).join('');
+
+  ov.innerHTML =
+   '<div class="modal" style="max-width:520px">'
+  +'  <div class="modal-hdr"><div>'
+  +'    <div style="font-size:9px;color:var(--mid);letter-spacing:3px;text-transform:uppercase">Restore Backup</div>'
+  +'    <div style="font-size:22px;font-weight:900;color:var(--tx);letter-spacing:1px">'+totalIn+' job'+(totalIn!==1?'s':'')+' found</div>'
+  +'  </div></div>'
+  +'  <div class="modal-body">'
+  +'    <table style="width:100%;border-collapse:collapse;font-size:12px;color:var(--tx)">'
+  +'      <thead><tr style="color:var(--mid);font-size:9px;text-transform:uppercase;letter-spacing:1px">'
+  +'        <th style="text-align:left;padding:4px 8px">Year</th>'
+  +'        <th style="text-align:right;padding:4px 8px">You have</th>'
+  +'        <th style="text-align:right;padding:4px 8px">In backup</th>'
+  +'        <th style="text-align:right;padding:4px 8px">New</th>'
+  +'      </tr></thead><tbody>'+tbl+'</tbody>'
+  +'    </table>'
+
+  +'    <div style="border:1.5px solid rgba(52,211,153,.5);background:rgba(52,211,153,.08);border-radius:10px;padding:12px">'
+  +'      <div style="color:var(--gr);font-weight:900;font-size:13px;letter-spacing:1px">\u2705 ADD MISSING &nbsp;\u00b7&nbsp; RECOMMENDED</div>'
+  +'      <div style="color:var(--tx);font-size:12px;margin-top:6px;line-height:1.6">'
+  +'        Adds <b>'+willAdd+'</b> job'+(willAdd!==1?'s':'')+' you don\u2019t have.<br>'
+  +'        Keeps all <b>'+willDelete+'</b> of your current jobs exactly as they are.<br>'
+  +'        <b>'+alreadyHave+'</b> already in your ledger \u2014 left untouched.<br>'
+  +'        <span style="color:var(--gr)">Nothing is deleted. Safe.</span>'
+  +'      </div>'
+  +'    </div>'
+
+  +'    <div style="border:1.5px solid rgba(248,113,113,.5);background:rgba(248,113,113,.08);border-radius:10px;padding:12px">'
+  +'      <div style="color:#f87171;font-weight:900;font-size:13px;letter-spacing:1px">\u26a0\ufe0f REPLACE &nbsp;\u00b7&nbsp; DESTRUCTIVE</div>'
+  +'      <div style="color:var(--tx);font-size:12px;margin-top:6px;line-height:1.6">'
+  +'        <b style="color:#f87171">Permanently deletes all '+willDelete+'</b> of your current jobs in '+yl.join(', ')+'.<br>'
+  +'        Replaces them with the '+totalIn+' from this backup.<br>'
+  +'        Any job added or edited since this backup is <b style="color:#f87171">gone forever</b>.<br>'
+  +'        <span style="color:#f87171">Cannot be undone.</span>'
+  +'      </div>'
+  +'    </div>'
+
+  +'    <div style="display:flex;flex-direction:column;gap:8px;margin-top:2px">'
+  +'      <button id="rs-add" class="btn btn-blue" style="width:100%;padding:14px;font-size:14px">\u2705 Add '+willAdd+' Missing Job'+(willAdd!==1?'s':'')+'</button>'
+  +'      <div style="display:flex;gap:8px">'
+  +'        <button id="rs-cancel" class="btn btn-dark" style="flex:1;padding:12px">Cancel</button>'
+  +'        <button id="rs-replace" class="btn btn-dark" style="flex:1;padding:12px;color:#f87171;border-color:rgba(248,113,113,.5)">Replace\u2026</button>'
+  +'      </div>'
+  +'    </div>'
+  +'  </div>'
+  +'</div>';
+
+  document.body.appendChild(ov);
+  function close(){ if(ov.parentNode) ov.parentNode.removeChild(ov); }
+
+  ov.querySelector('#rs-cancel').onclick = close;
+  ov.querySelector('#rs-add').onclick = function(){ close(); applyRestore(parsed, false); };
+
+  ov.querySelector('#rs-replace').onclick = function(){
+    // Gate 1: back up first — you're about to destroy data
+    if(willDelete > 0){
+      if(window.confirm('BACK UP FIRST?\n\nYou are about to permanently delete '+willDelete+' jobs.\n\nOK = save a backup now (strongly recommended)\nCancel = skip and continue')){
+        close(); doBackup();
+        alert('Backup saved. Open Restore again and choose Replace to continue.');
+        return;
+      }
+    }
+    // Gate 2: type the word
+    var typed = window.prompt(
+      'FINAL CONFIRMATION\n\n'+
+      'This DELETES '+willDelete+' jobs in '+yl.join(', ')+' forever.\n\n'+
+      'Type  REPLACE  in capitals to proceed:');
+    if(typed === null) return;
+    if(typed.trim().toUpperCase() !== 'REPLACE'){
+      alert('Not replaced \u2014 nothing was changed.\n\nYour jobs are safe.');
+      return;
+    }
+    close();
+    applyRestore(parsed, true);
+  };
 }
 
 function doRestore(e){
